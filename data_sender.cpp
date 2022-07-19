@@ -59,7 +59,8 @@ int main()
     std::string local_ip_s = configval.local_ip;
     std::string remote_ip_s = configval.remote_ip;
 
-    // SCTP
+    // SCTP client ====================
+
     int client_fd, i, flags;
     struct sockaddr_in local_addr;
     struct sockaddr_in remote_addr;
@@ -92,8 +93,8 @@ int main()
     int res_conn = connect(client_fd, (struct sockaddr *)&remote_addr, sizeof(remote_addr));
     if (res_conn != 0)
     {
-        std::cout << "\n connect error: " << res_conn << "\n";
-        return 1;
+        std::cout << "\n Connect error: " << res_conn << "\n";
+        exit(1);
     }
 
     memset((void *)&events, 0, sizeof(events));
@@ -101,7 +102,7 @@ int main()
     setsockopt(client_fd, SOL_SCTP, SCTP_EVENTS,
                (const void *)&events, sizeof(events));
 
-    /* Sending three messages on different streams */
+    //============================================
 
     DataSender::CMsgBuffer msgBufferObj(configval);
 
@@ -118,16 +119,17 @@ int main()
         {            
             do
             {
-              std::cout << "recv_n == " << recv_n << "\n";
-
-              int recv_n = sctp_recvmsg(client_fd, recvBuffer_p, msgBufferObj.getMaxDataBuffer(), (struct sockaddr *)NULL, 0, &sndrcvinfo, &flags );
-
-              std::cout << "recv_n == " << recv_n << "\n";
-
+              recv_n = sctp_recvmsg(client_fd, recvBuffer_p, msgBufferObj.getMaxDataBuffer(), (struct sockaddr *)NULL, 0, &sndrcvinfo, &flags );
+              
             } while (recv_n <= 0);
-        }        
+        }
+        else
+        {
+            std::cout << "Error: sent_n ==" << sent_n << "\n";
+            exit(1);
+        }
 
-        std::cout << "sent_n: " << sent_n << "recv_n: " << recv_n << " ===> ";
+        std::cout << "sent_n: " << sent_n << " recv_n: " << recv_n << " ===> ";
 
         if ((sent_n == recv_n) &&
             (std::equal((uint8_t*)sentBuffer_p, ((uint8_t*)sentBuffer_p) + sent_n, (uint8_t*)recvBuffer_p) == true))
@@ -150,9 +152,8 @@ int main()
             std::this_thread::sleep_for(std::chrono::milliseconds(configval.delay_after_aliquot_ms));
         }
     }
-    // zmq_close (clientSocket);
-    // zmq_ctx_destroy (clientContext);
-
+    close(client_fd);
+    
     boost::posix_time::ptime now_stat = boost::posix_time::second_clock::local_time();
     std::string time_stat = to_iso_extended_string(now_stat);
 
